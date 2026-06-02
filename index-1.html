@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AuraChat — AI Чат</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;background:#080808;font-family:'DM Sans',sans-serif;}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-thumb{background:#333;border-radius:4px;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .screen{display:none;animation:fadeUp .5s ease forwards;}
+  .screen.active{display:flex;}
+  .char-card{transition:transform .2s,box-shadow .2s;cursor:pointer;}
+  .char-card:hover{transform:translateY(-3px);}
+  .send-btn{transition:all .15s;}
+  .send-btn:hover:not(:disabled){transform:scale(1.08);}
+  .send-btn:active:not(:disabled){transform:scale(.94);}
+  input:focus,textarea:focus{outline:none;}
+  .msg{animation:fadeUp .3s ease forwards;}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;animation:bounce 1.2s ease-in-out infinite;}
+</style>
+</head>
+<body>
+
+<!-- KEY SCREEN -->
+<div id="keyScreen" class="screen active" style="min-height:100vh;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:420px;">
+    <div style="text-align:center;margin-bottom:40px;">
+      <div style="font-size:52px;margin-bottom:12px;">🤖</div>
+      <h1 style="font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:#fff;letter-spacing:-.5px;">AuraChat</h1>
+      <p style="color:#555;font-size:15px;margin-top:6px;">Альтернатива Chai AI на базе Groq</p>
+    </div>
+    <div style="background:#111;border:1px solid #222;border-radius:20px;padding:32px;">
+      <label style="display:block;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Groq API Key</label>
+      <input id="apiKeyInput" type="password" placeholder="gsk_••••••••••••••••"
+        style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:14px 16px;color:#fff;font-size:15px;font-family:monospace;margin-bottom:16px;transition:border-color .2s;"
+        onfocus="this.style.borderColor='#00f5d4'" onblur="this.style.borderColor='#2a2a2a'"/>
+      <button onclick="submitKey()"
+        style="width:100%;background:#00f5d4;color:#000;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;transition:opacity .2s;"
+        onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        Войти →
+      </button>
+      <p id="keyError" style="color:#ff6b6b;font-size:13px;text-align:center;margin-top:12px;display:none;"></p>
+      <p style="color:#444;font-size:12px;text-align:center;margin-top:20px;line-height:1.6;">
+        Получи бесплатный ключ на <a href="https://console.groq.com" target="_blank" style="color:#00f5d4;text-decoration:none;">console.groq.com</a><br/>Ключ хранится только в твоём браузере
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- CHARACTER SELECT -->
+<div id="charScreen" class="screen" style="min-height:100vh;flex-direction:column;padding:40px 20px;">
+  <div style="max-width:600px;width:100%;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:36px;">
+      <h1 style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#fff;">Выбери собеседника</h1>
+      <p style="color:#555;font-size:14px;margin-top:6px;">Каждый персонаж — уникальная личность</p>
+    </div>
+    <div id="charList" style="display:flex;flex-direction:column;gap:12px;"></div>
+    <p style="text-align:center;color:#333;font-size:12px;margin-top:24px;">Powered by Groq × Llama 3.3</p>
+  </div>
+</div>
+
+<!-- CHAT SCREEN -->
+<div id="chatScreen" class="screen" style="height:100vh;flex-direction:column;">
+  <!-- Header -->
+  <div id="chatHeader" style="background:#0e0e0e;border-bottom:1px solid #1a1a1a;padding:14px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+    <button onclick="goBack()" style="background:none;border:none;color:#555;font-size:22px;cursor:pointer;padding:0 4px;transition:color .2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#555'">‹</button>
+    <span id="charEmoji" style="font-size:28px;"></span>
+    <div>
+      <div id="charName" style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:#fff;"></div>
+      <div id="charRole" style="font-size:11px;"></div>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+      <span id="statusDot" style="width:7px;height:7px;border-radius:50%;background:#80ed99;display:inline-block;"></span>
+      <span id="statusText" style="color:#444;font-size:12px;">онлайн</span>
+    </div>
+  </div>
+  <!-- Messages -->
+  <div id="messages" style="flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:12px;"></div>
+  <!-- Error -->
+  <div id="errorBox" style="display:none;background:#2a0a0a;border:1px solid #5a1a1a;border-radius:12px;padding:12px 16px;color:#ff6b6b;font-size:13px;text-align:center;margin:0 16px;"></div>
+  <!-- Input -->
+  <div style="background:#0e0e0e;border-top:1px solid #1a1a1a;padding:14px 16px;display:flex;gap:10px;align-items:flex-end;flex-shrink:0;">
+    <textarea id="msgInput" rows="1" placeholder="Написать..."
+      style="flex:1;background:#1a1a1a;border:1px solid #252525;border-radius:14px;padding:12px 16px;color:#e0e0e0;font-size:14px;font-family:'DM Sans',sans-serif;resize:none;line-height:1.5;max-height:120px;overflow-y:auto;transition:border-color .2s;"
+      oninput="autoResize(this)"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"
+      onfocus="this.style.borderColor=currentChar?.accent+'66'||'#00f5d4'" 
+      onblur="this.style.borderColor='#252525'"></textarea>
+    <button id="sendBtn" onclick="sendMessage()"
+      style="width:44px;height:44px;border-radius:12px;border:none;background:#00f5d4;color:#000;font-size:18px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      ↑
+    </button>
+  </div>
+</div>
+
+<script>
+const CHARACTERS = [
+  {id:"alex",name:"Алекс",emoji:"🧑‍💻",role:"Друг-разработчик",color:"#00f5d4",bg:"linear-gradient(135deg,#0a2a2a,#0d3d3d)",accent:"#00f5d4",
+   system:"Ты — Алекс, дружелюбный разработчик-энтузиаст. Говоришь на русском, неформально, любишь шутить про код. Всегда готов помочь с программированием."},
+  {id:"luna",name:"Луна",emoji:"🌙",role:"Мистическая собеседница",color:"#c77dff",bg:"linear-gradient(135deg,#1a0a2e,#2d1b4e)",accent:"#c77dff",
+   system:"Ты — Луна, загадочная мудрая собеседница. Говоришь красиво, поэтично. Любишь философские темы, космос. Отвечаешь на русском, используешь красивые метафоры."},
+  {id:"viktor",name:"Виктор",emoji:"🧠",role:"Строгий наставник",color:"#f77f00",bg:"linear-gradient(135deg,#1a0f00,#2e1a00)",accent:"#f77f00",
+   system:"Ты — Виктор, строгий но справедливый наставник. Говоришь прямо, без лишних слов. Отвечаешь на русском. Требователен, но хвалишь за реальный прогресс."},
+  {id:"mia",name:"Миа",emoji:"✨",role:"Весёлая подруга",color:"#ff6b9d",bg:"linear-gradient(135deg,#2a0a1a,#3d1228)",accent:"#ff6b9d",
+   system:"Ты — Миа, весёлая энергичная подруга. Много эмодзи, говоришь на русском очень живо. Любишь музыку, путешествия."},
+  {id:"zen",name:"Дзен",emoji:"☯️",role:"Философ",color:"#80ed99",bg:"linear-gradient(135deg,#061a0e,#0d2e19)",accent:"#80ed99",
+   system:"Ты — Дзен, спокойный философ. Говоришь размеренно и глубоко. Отвечаешь на русском. Любишь цитировать мудрецов, помогаешь найти внутренний покой."}
+];
+
+const GREETINGS = {
+  alex:"Йо! 👋 Алекс на связи. Что сегодня кодим или обсуждаем?",
+  luna:"Приветствую тебя... Я чувствую, что у тебя есть вопросы, которые ждут своего часа 🌙",
+  viktor:"Слушаю. Говори — что нужно?",
+  mia:"Привееет!! ✨✨ Так рада тебя видеть! Как дела, как настроение?? 🥳",
+  zen:"Добро пожаловать в тишину... Что привело тебя сюда сегодня? ☯️"
+};
+
+let apiKey = "";
+let currentChar = null;
+let chatHistory = [];
+let streaming = false;
+
+// Build character list
+CHARACTERS.forEach((c,i)=>{
+  const btn = document.createElement("button");
+  btn.className="char-card";
+  btn.style.cssText=`background:${c.bg};border:1px solid ${c.accent}22;border-radius:18px;padding:20px 24px;width:100%;text-align:left;display:flex;align-items:center;gap:16px;animation:fadeUp .4s ease ${i*0.07}s both;`;
+  btn.innerHTML=`<span style="font-size:40px;flex-shrink:0">${c.emoji}</span><div><div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px;color:#fff;margin-bottom:3px">${c.name}</div><div style="color:${c.accent};font-size:13px;font-weight:500">${c.role}</div></div><span style="margin-left:auto;color:#444;font-size:22px">›</span>`;
+  btn.onmouseover=()=>btn.style.boxShadow=`0 8px 32px ${c.accent}22`;
+  btn.onmouseout=()=>btn.style.boxShadow="none";
+  btn.onclick=()=>startChat(c);
+  document.getElementById("charList").appendChild(btn);
+});
+
+function show(id){
+  ["keyScreen","charScreen","chatScreen"].forEach(s=>{
+    const el=document.getElementById(s);
+    el.classList.remove("active");
+    el.style.display="none";
+  });
+  const target=document.getElementById(id);
+  target.style.display=id==="chatScreen"?"flex":"flex";
+  target.classList.add("active");
+}
+
+function submitKey(){
+  const val=document.getElementById("apiKeyInput").value.trim();
+  const err=document.getElementById("keyError");
+  if(!val.startsWith("gsk_")){err.textContent="Ключ должен начинаться с gsk_";err.style.display="block";return;}
+  err.style.display="none";
+  apiKey=val;
+  show("charScreen");
+}
+document.getElementById("apiKeyInput").addEventListener("keydown",e=>{if(e.key==="Enter")submitKey();});
+
+function startChat(char){
+  currentChar=char;
+  chatHistory=[];
+  document.getElementById("charEmoji").textContent=char.emoji;
+  document.getElementById("charName").textContent=char.name;
+  document.getElementById("charRole").textContent=char.role;
+  document.getElementById("charRole").style.color=char.accent;
+  document.getElementById("msgInput").placeholder=`Написать ${char.name}...`;
+  document.getElementById("sendBtn").style.background=char.accent;
+  document.getElementById("messages").innerHTML="";
+  document.getElementById("errorBox").style.display="none";
+  show("chatScreen");
+  addMessage("assistant",GREETINGS[char.id]);
+  chatHistory.push({role:"assistant",content:GREETINGS[char.id]});
+  setTimeout(()=>document.getElementById("msgInput").focus(),200);
+}
+
+function goBack(){show("charScreen");}
+
+function addMessage(role,content,isTemp=false){
+  const msgs=document.getElementById("messages");
+  const wrap=document.createElement("div");
+  wrap.className="msg";
+  wrap.style.cssText=`display:flex;justify-content:${role==="user"?"flex-end":"flex-start"};gap:8px;align-items:flex-end;`;
+  if(isTemp)wrap.id="tempMsg";
+
+  const bubble=document.createElement("div");
+  bubble.style.cssText=`max-width:75%;background:${role==="user"?currentChar.accent:"#161616"};color:${role==="user"?"#000":"#e0e0e0"};border-radius:${role==="user"?"18px 18px 4px 18px":"18px 18px 18px 4px"};padding:12px 16px;font-size:14px;line-height:1.6;${role==="user"?"font-weight:500":"border:1px solid #1e1e1e;"};word-break:break-word;white-space:pre-wrap;`;
+  bubble.textContent=content;
+  if(isTemp)bubble.id="tempBubble";
+
+  if(role==="assistant"){
+    const emo=document.createElement("span");
+    emo.textContent=currentChar.emoji;
+    emo.style.cssText="font-size:24px;flex-shrink:0;margin-bottom:2px;";
+    wrap.appendChild(emo);
+  }
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  msgs.scrollTop=msgs.scrollHeight;
+  return bubble;
+}
+
+function setStatus(typing){
+  const dot=document.getElementById("statusDot");
+  const txt=document.getElementById("statusText");
+  dot.style.background=typing?"#f77f00":"#80ed99";
+  dot.style.animation=typing?"pulse 1s infinite":"none";
+  txt.textContent=typing?"печатает...":"онлайн";
+  streaming=typing;
+  const btn=document.getElementById("sendBtn");
+  btn.disabled=typing;
+  btn.style.background=typing?"#222":currentChar.accent;
+  btn.style.color=typing?"#444":"#000";
+  btn.style.cursor=typing?"not-allowed":"pointer";
+}
+
+function showTypingDots(){
+  const msgs=document.getElementById("messages");
+  const wrap=document.createElement("div");
+  wrap.id="typingWrap";
+  wrap.style.cssText="display:flex;align-items:flex-end;gap:8px;animation:fadeUp .3s ease forwards;";
+  const emo=document.createElement("span");
+  emo.textContent=currentChar.emoji;
+  emo.style.cssText="font-size:24px;flex-shrink:0;";
+  const bubble=document.createElement("div");
+  bubble.style.cssText="background:#161616;border:1px solid #1e1e1e;border-radius:18px 18px 18px 4px;padding:12px 16px;display:flex;gap:4px;align-items:center;";
+  [0,1,2].forEach(i=>{
+    const d=document.createElement("span");
+    d.className="dot";
+    d.style.background=currentChar.accent;
+    d.style.animationDelay=`${i*.2}s`;
+    bubble.appendChild(d);
+  });
+  wrap.appendChild(emo);wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function removeTypingDots(){
+  const el=document.getElementById("typingWrap");
+  if(el)el.remove();
+}
+
+async function sendMessage(){
+  const input=document.getElementById("msgInput");
+  const text=input.value.trim();
+  if(!text||streaming)return;
+
+  addMessage("user",text);
+  chatHistory.push({role:"user",content:text});
+  input.value="";
+  input.style.height="auto";
+  document.getElementById("errorBox").style.display="none";
+  setStatus(true);
+  showTypingDots();
+
+  try{
+    const res=await fetch("https://api.groq.com/openai/v1/chat/completions",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":`Bearer ${apiKey}`},
+      body:JSON.stringify({
+        model:"llama-3.3-70b-versatile",
+        messages:[{role:"system",content:currentChar.system},...chatHistory],
+        stream:true,max_tokens:600,temperature:.9
+      })
+    });
+
+    if(!res.ok){
+      const e=await res.json();
+      throw new Error(e.error?.message||"Ошибка API");
+    }
+
+    removeTypingDots();
+    const bubble=addMessage("assistant","");
+    const reader=res.body.getReader();
+    const dec=new TextDecoder();
+    let full="";
+
+    while(true){
+      const{done,value}=await reader.read();
+      if(done)break;
+      const lines=dec.decode(value).split("\n").filter(l=>l.startsWith("data: "));
+      for(const line of lines){
+        const data=line.slice(6);
+        if(data==="[DONE]")continue;
+        try{
+          const delta=JSON.parse(data).choices?.[0]?.delta?.content||"";
+          full+=delta;
+          bubble.textContent=full;
+          document.getElementById("messages").scrollTop=document.getElementById("messages").scrollHeight;
+        }catch{}
+      }
+    }
+    chatHistory.push({role:"assistant",content:full});
+  }catch(e){
+    removeTypingDots();
+    const err=document.getElementById("errorBox");
+    err.textContent="⚠️ "+e.message;
+    err.style.display="block";
+    chatHistory.pop();
+  }finally{
+    setStatus(false);
+    setTimeout(()=>document.getElementById("msgInput").focus(),100);
+  }
+}
+
+function autoResize(el){
+  el.style.height="auto";
+  el.style.height=Math.min(el.scrollHeight,120)+"px";
+}
+</script>
+</body>
+</html>
